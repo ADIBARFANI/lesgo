@@ -34,13 +34,24 @@
         </div>
     </header>
 
+    <!-- Camera Modal Overlay -->
+    <div id="camera-modal" class="modal hidden">
+        <div class="modal-content">
+            <video id="camera-video" autoplay playsinline></video>
+            <div class="modal-actions">
+                <button class="btn btn-primary" id="btn-capture"><i class="fa-solid fa-camera"></i> Capture</button>
+                <button class="btn btn-outline" id="btn-close-camera"><i class="fa-solid fa-xmark"></i> Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Main Application Layout -->
     <div class="app-container">
         
         <!-- Left Column: Main Dashboard -->
         <main class="main-content">
             
-            <!-- Hero / Scanner Section -->
+            <!-- Scanner Section -->
             <section class="scanner-section">
                 <div class="section-header text-center">
                     <h2>Smart Waste Classifier</h2>
@@ -157,7 +168,7 @@
 
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- Leaflet Map JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Custom JS -->
     <script src="app.js"></script>
