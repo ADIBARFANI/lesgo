@@ -153,7 +153,7 @@
                 <h3>AI Settings</h3>
                 <i class="fa-solid fa-gear"></i>
             </div>
-            <p class="sidebar-desc">By default this demo uses a mock classifier. To use the real AI, paste a Google Gemini API key below. It is stored locally in your browser.</p>
+            <p class="sidebar-desc">This demo uses the <strong>Google Gemini API</strong>. A key is hardcoded for this demo, but you can override it below.</p>
             
             <div class="input-group">
                 <input type="password" id="api-key-input" placeholder="Paste Gemini API key">
@@ -164,6 +164,17 @@
                 <button class="btn btn-outline" id="btn-clear-key">Clear</button>
             </div>
             <div id="api-status" class="status-message"></div>
+
+            <hr style="border-color: var(--border-color); margin: 20px 0;">
+            
+            <h4 style="margin-bottom: 10px; font-size: 0.9rem;">Waste Categories Legend</h4>
+            <ul class="legend-list">
+                <li><span class="legend-color" style="background: #10b981;"></span> Organic (Green)</li>
+                <li><span class="legend-color" style="background: #eab308;"></span> Inorganic (Yellow)</li>
+                <li><span class="legend-color" style="background: #ef4444;"></span> Hazardous (B3) (Red)</li>
+                <li><span class="legend-color" style="background: #3b82f6;"></span> Recyclable (Blue)</li>
+                <li><span class="legend-color" style="background: #94a3b8;"></span> Residual (Grey)</li>
+            </ul>
         </aside>
 
     </div>
