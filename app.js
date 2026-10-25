@@ -1,3 +1,9 @@
+// ==========================================
+// ⚠️ HARDCODED API KEY (FOR DEMO ONLY)
+// Replace the text below with your actual API key
+// ==========================================
+const HARDCODED_API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE"; 
+
 document.addEventListener('DOMContentLoaded', () => {
     
     // --- DOM Elements ---
@@ -132,7 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- 3. REAL AI INTEGRATION (GEMINI) ---
 
     async function runAIAnalysis(imageUrl) {
-        const apiKey = localStorage.getItem('geminiApiKey');
+        let apiKey = HARDCODED_API_KEY;
+        if (apiKey === "PASTE_YOUR_GEMINI_API_KEY_HERE" || apiKey === "") {
+            apiKey = localStorage.getItem('geminiApiKey');
+        }
 
         if (!apiKey) {
             apiStatus.textContent = "No API key found. Using mock data...";
@@ -148,16 +157,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const base64Data = imageUrl.split(',')[1];
 
+            // UPDATED PROMPT: Restricting to 5 specific categories with definitions
             const payload = {
                 contents: [{
                     parts: [
-                        { text: `Analyze this image of waste. Return a strict JSON object with the following schema: 
+                        { text: `Analyze this image of waste. Categorize it strictly into ONE of these 5 categories based on Indonesian waste management standards:
+                        1. "Organic" (Food waste, leaves, biodegradable materials)
+                        2. "Inorganic" (Non-recyclable non-organic waste like ceramics, dirty wrappers, rubber)
+                        3. "Hazardous (B3)" (Batteries, electronics, chemicals, medical waste)
+                        4. "Recyclable" (Clean paper, plastic bottles, glass, metal cans)
+                        5. "Residual" (General trash, diapers, heavily soiled items, styrofoam)
+
+                        Return a strict JSON object with the following schema: 
                         { 
-                          "object_name": "string (what is the item)", 
+                          "object_name": "string (what is the specific item)", 
                           "confidence": number (0-100), 
-                          "category": "string (e.g., Plastic, Paper, Glass, Metal, E-Waste, Organic)", 
-                          "bin_color": "string (Choose exactly one: Blue for Paper, Yellow for Plastic, Green for Organic, Red for Hazardous/E-Waste, Grey for General/Metal/Glass)", 
-                          "preparation_tips": ["string", "string"], 
+                          "category": "string (Must be exactly one of: 'Organic', 'Inorganic', 'Hazardous (B3)', 'Recyclable', 'Residual')", 
+                          "bin_color": "string (Map directly: Green for Organic, Yellow for Inorganic, Red for Hazardous (B3), Blue for Recyclable, Grey for Residual)", 
+                          "preparation_tips": ["string", "string", "string"], 
                           "fun_fact": "string", 
                           "recycling_ideas": ["string", "string"] 
                         }. Do not include markdown formatting or backticks. Return ONLY the raw JSON.` },
@@ -219,10 +236,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const binText = document.getElementById('result-bin-text');
         binText.textContent = `${data.bin_color} Bin`;
         
+        // UPDATED COLOR MAP: Strictly matching the 5 categories
         const colorMap = {
-            'Yellow': '#eab308', 'Blue': '#3b82f6', 'Red': '#ef4444', 
-            'Green': '#10b981', 'Grey': '#94a3b8', 'Gray': '#94a3b8',
-            'Brown': '#854d0e', 'Orange': '#f97316'
+            'Green': '#10b981',   // Organic
+            'Yellow': '#eab308',  // Inorganic
+            'Red': '#ef4444',     // Hazardous (B3)
+            'Blue': '#3b82f6',    // Recyclable
+            'Grey': '#94a3b8',    // Residual
+            'Gray': '#94a3b8'     // Fallback US spelling
         };
         const binColor = colorMap[data.bin_color] || '#94a3b8';
         
@@ -252,124 +273,136 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // --- 5. EXPANDED MOCK DATA ENGINE (12 Objects) ---
+    // --- 5. EXPANDED MOCK DATA ENGINE (Aligned to 5 Categories) ---
 
     function getRandomMockData() {
         const mocks = [
+            // 1. Recyclable (Blue)
             {
                 "object_name": "Crushed Plastic Water Bottle",
                 "confidence": 92,
-                "category": "Plastic (PET)",
-                "bin_color": "Yellow",
+                "category": "Recyclable",
+                "bin_color": "Blue",
                 "preparation_tips": ["Rinse out liquid residue", "Compress the bottle tightly", "Remove and separate the plastic cap"],
                 "fun_fact": "Recycling a single plastic bottle saves enough energy to power a lightbulb for up to 3 hours.",
                 "recycling_ideas": ["Transform into a self-watering plant pot.", "Cut and smooth edges to create a desk pen holder.", "Collect caps for community art installations."]
             },
-            {
-                "object_name": "Cardboard Shipping Box",
-                "confidence": 88,
-                "category": "Paper & Cardboard",
-                "bin_color": "Blue",
-                "preparation_tips": ["Flatten the box completely", "Remove any plastic tape or bubble wrap", "Keep it dry and free of food grease"],
-                "fun_fact": "Recycling cardboard uses 75% less energy than making it from raw wood pulp.",
-                "recycling_ideas": ["Use as a weed barrier in your garden.", "Build a DIY cat scratching pad.", "Create custom storage bins for your closet."]
-            },
-            {
-                "object_name": "Glass Food Jar",
-                "confidence": 95,
-                "category": "Glass",
-                "bin_color": "Grey",
-                "preparation_tips": ["Scrape out all food residue", "Rinse thoroughly with water", "Remove the metal lid (recycle separately)"],
-                "fun_fact": "Glass can be recycled endlessly without losing its quality or purity.",
-                "recycling_ideas": ["Use as a rustic candle holder.", "Store homemade spices and jams.", "Create a terrarium for small succulents."]
-            },
-            {
-                "object_name": "Old Smartphone",
-                "confidence": 89,
-                "category": "E-Waste",
-                "bin_color": "Red",
-                "preparation_tips": ["Factory reset the device to erase data", "Remove the SIM and SD cards", "Do not throw in regular trash"],
-                "fun_fact": "E-waste contains precious metals like gold and silver that can be recovered and reused.",
-                "recycling_ideas": ["Use as a dedicated dashcam or security camera.", "Turn it into a digital photo frame.", "Donate it to local electronics recycling programs."]
-            },
-            {
-                "object_name": "Aluminum Soda Can",
-                "confidence": 96,
-                "category": "Metal",
-                "bin_color": "Grey",
-                "preparation_tips": ["Empty any remaining liquid", "Rinse quickly to prevent pests", "Crush to save space in the bin"],
-                "fun_fact": "Recycling aluminum saves 95% of the energy needed to make new aluminum from raw ore.",
-                "recycling_ideas": ["Cut into strips to make a decorative lantern.", "Use as miniature plant pots.", "Create a DIY bird feeder."]
-            },
+            // 2. Organic (Green)
             {
                 "object_name": "Banana Peel",
                 "confidence": 98,
-                "category": "Organic Waste",
+                "category": "Organic",
                 "bin_color": "Green",
                 "preparation_tips": ["Remove any plastic stickers", "Chop into smaller pieces to speed up composting", "Keep separate from dry recyclables"],
                 "fun_fact": "Banana peels decompose in just 3-4 weeks, returning valuable nutrients to the soil.",
                 "recycling_ideas": ["Use as a natural fertilizer for tomato plants.", "Blend with water for a DIY plant spray.", "Use the inside to polish leather shoes."]
             },
+            // 3. Hazardous (B3) (Red)
             {
                 "object_name": "Used AA Battery",
                 "confidence": 91,
-                "category": "Hazardous Waste",
+                "category": "Hazardous (B3)",
                 "bin_color": "Red",
                 "preparation_tips": ["Tape the ends with clear tape to prevent sparks", "Do not puncture or crush", "Store in a cool, dry place until drop-off"],
                 "fun_fact": "Batteries contain heavy metals that can leach into the soil and contaminate groundwater if thrown in regular trash.",
                 "recycling_ideas": ["Look for specialized battery drop-off bins at electronics stores.", "Check if your local municipality has a hazardous waste day."]
             },
+            // 4. Residual (Grey)
+            {
+                "object_name": "Used Baby Diaper",
+                "confidence": 85,
+                "category": "Residual",
+                "bin_color": "Grey",
+                "preparation_tips": ["Roll up tightly and secure with the adhesive tabs", "Wrap in a plastic bag to contain odors", "Place in general residual waste bin"],
+                "fun_fact": "Disposable diapers take up to 500 years to decompose in a landfill and cannot be recycled.",
+                "recycling_ideas": ["Consider switching to cloth diapers to reduce waste.", "Look for local programs that compost diapers (very rare)."]
+            },
+            // 5. Inorganic (Yellow)
+            {
+                "object_name": "Broken Ceramic Mug",
+                "confidence": 87,
+                "category": "Inorganic",
+                "bin_color": "Yellow",
+                "preparation_tips": ["Wrap sharp pieces in newspaper for safety", "Do NOT put in glass recycling (different melting point)", "Place in inorganic waste bin"],
+                "fun_fact": "Ceramics melt at a much higher temperature than glass, meaning they can ruin an entire batch of recycled glass.",
+                "recycling_ideas": ["Use broken pieces for mosaic art.", "Crush into small pieces for drainage in plant pots.", "Use the handle as a small tool."]
+            },
+            // 6. Recyclable (Blue)
             {
                 "object_name": "Stack of Newspapers",
                 "confidence": 94,
-                "category": "Paper",
+                "category": "Recyclable",
                 "bin_color": "Blue",
                 "preparation_tips": ["Keep dry and clean", "Remove any plastic delivery bags", "Do not tie with string or wire"],
                 "fun_fact": "A single sheet of newspaper can be recycled up to 7 times before the fibers become too short.",
                 "recycling_ideas": ["Use for cleaning windows (no streaks!).", "Create DIY paper mache crafts.", "Use as biodegradable wrapping paper."]
             },
+            // 7. Hazardous (B3) (Red)
             {
-                "object_name": "Broken Ceramic Mug",
-                "confidence": 87,
-                "category": "General Waste",
+                "object_name": "Old Smartphone",
+                "confidence": 89,
+                "category": "Hazardous (B3)",
+                "bin_color": "Red",
+                "preparation_tips": ["Factory reset the device to erase data", "Remove the SIM and SD cards", "Do not throw in regular trash"],
+                "fun_fact": "E-waste contains precious metals like gold and silver that can be recovered and reused.",
+                "recycling_ideas": ["Use as a dedicated dashcam or security camera.", "Turn it into a digital photo frame.", "Donate it to local electronics recycling programs."]
+            },
+            // 8. Residual (Grey)
+            {
+                "object_name": "Styrofoam Food Container",
+                "confidence": 88,
+                "category": "Residual",
                 "bin_color": "Grey",
-                "preparation_tips": ["Do NOT put in glass recycling (different melting point)", "Wrap sharp pieces in newspaper", "Place in general waste bin"],
-                "fun_fact": "Ceramics melt at a much higher temperature than glass, meaning they can ruin an entire batch of recycled glass.",
-                "recycling_ideas": ["Use broken pieces for mosaic art.", "Crush into small pieces for drainage in plant pots.", "Use the handle as a small tool."]
+                "preparation_tips": ["Scrape out food residue", "Rinse if possible", "Place in general residual bin (not recyclable)"],
+                "fun_fact": "Styrofoam is notoriously difficult to recycle and can take over 500 years to break down.",
+                "recycling_ideas": ["Reuse as a paint palette for DIY projects.", "Use as packing material for shipping.", "Avoid buying styrofoam in the future."]
             },
+            // 9. Organic (Green)
             {
-                "object_name": "Plastic Grocery Bag",
-                "confidence": 85,
-                "category": "Soft Plastic",
-                "bin_color": "Yellow",
-                "preparation_tips": ["Collect all soft plastics in one large bag", "Ensure they are clean and dry", "Check for local store drop-off points"],
-                "fun_fact": "Soft plastics like grocery bags can take over 500 years to break down in a landfill.",
-                "recycling_ideas": ["Crochet into a durable reusable tote bag.", "Use as trash can liners.", "Stuff into a pillowcase to make a DIY pet bed."]
-            },
-            {
-                "object_name": "Greasy Pizza Box",
-                "confidence": 82,
-                "category": "Organic / Paper Mix",
+                "object_name": "Vegetable Scraps",
+                "confidence": 96,
+                "category": "Organic",
                 "bin_color": "Green",
-                "preparation_tips": ["Tear off the clean lid (recycle as paper)", "Place the greasy bottom in compost/green bin", "Do not put greasy cardboard in blue bin"],
-                "fun_fact": "Grease and oil soak into paper fibers, making them impossible to recycle into new paper products.",
-                "recycling_ideas": ["Use the clean lid as a canvas for art.", "Shred the clean parts for homemade seed starters."]
+                "preparation_tips": ["Remove any plastic packaging or rubber bands", "Chop into smaller pieces", "Add to compost bin"],
+                "fun_fact": "Composting vegetable scraps creates nutrient-rich soil that reduces the need for chemical fertilizers.",
+                "recycling_ideas": ["Make homemade vegetable broth.", "Use as feed for backyard chickens or worms.", "Blend into a liquid fertilizer."]
             },
+            // 10. Recyclable (Blue)
+            {
+                "object_name": "Aluminum Soda Can",
+                "confidence": 96,
+                "category": "Recyclable",
+                "bin_color": "Blue",
+                "preparation_tips": ["Empty any remaining liquid", "Rinse quickly to prevent pests", "Crush to save space in the bin"],
+                "fun_fact": "Recycling aluminum saves 95% of the energy needed to make new aluminum from raw ore.",
+                "recycling_ideas": ["Cut into strips to make a decorative lantern.", "Use as miniature plant pots.", "Create a DIY bird feeder."]
+            },
+            // 11. Hazardous (B3) (Red)
             {
                 "object_name": "Empty Aerosol Spray Can",
                 "confidence": 90,
-                "category": "Metal",
-                "bin_color": "Grey",
-                "preparation_tips": ["Ensure the can is completely empty", "Do not puncture or crush the can", "Remove plastic caps and recycle separately"],
-                "fun_fact": "Aerosol cans are made of steel and aluminum, both of which are highly recyclable and valuable.",
+                "category": "Hazardous (B3)",
+                "bin_color": "Red",
+                "preparation_tips": ["Ensure the can is completely empty", "Do not puncture or crush the can", "Check if your local hazardous waste facility accepts them"],
+                "fun_fact": "Aerosol cans are pressurized and can explode if punctured or incinerated.",
                 "recycling_ideas": ["Check if your local scrap yard accepts them.", "Use the empty can for a DIY spray paint project."]
+            },
+            // 12. Inorganic (Yellow)
+            {
+                "object_name": "Dirty Plastic Wrapper",
+                "confidence": 83,
+                "category": "Inorganic",
+                "bin_color": "Yellow",
+                "preparation_tips": ["Wipe off excess food or grease", "Do not put in recyclable bin (too dirty)", "Place in inorganic waste bin"],
+                "fun_fact": "Dirty plastic wrappers are often too contaminated to be recycled and end up in landfills.",
+                "recycling_ideas": ["Use as a makeshift waterproof layer for outdoor projects.", "Stuff into a pillowcase to make a DIY pet bed."]
             }
         ];
         
         return mocks[Math.floor(Math.random() * mocks.length)];
     }
 
-    // --- 6. API KEY MANAGEMENT ---
+    // --- 6. API KEY MANAGEMENT (Sidebar fallback) ---
 
     if (localStorage.getItem('geminiApiKey')) {
         apiKeyInput.value = localStorage.getItem('geminiApiKey');
