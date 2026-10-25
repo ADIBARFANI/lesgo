@@ -6,12 +6,16 @@
     <title>Smart Waste Classifier</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome for Icons -->
+    <!-- FontAwesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Leaflet Map CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
+    
+    <!-- TensorFlow.js and MobileNet for Offline AI -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
 </head>
 <body>
 
@@ -67,15 +71,14 @@
                         </div>
                         <h3>DROP IMAGE OR START CAMERA</h3>
                     </div>
-                    <!-- Preview image will be injected here -->
                     <img id="image-preview" class="image-preview hidden" alt="Waste Preview">
                 </div>
 
                 <div class="scan-actions">
-                    <button class="btn btn-primary" id="btn-camera">
+                    <button class="btn btn-primary" id="btn-camera" disabled>
                         <i class="fa-solid fa-camera"></i> Live Camera
                     </button>
-                    <button class="btn btn-secondary" id="btn-upload">
+                    <button class="btn btn-secondary" id="btn-upload" disabled>
                         <i class="fa-solid fa-image"></i> Upload Photo
                     </button>
                 </div>
@@ -116,9 +119,7 @@
                 <div class="results-grid two-col">
                     <div class="card">
                         <h3><i class="fa-solid fa-list-check"></i> Preparation Tips</h3>
-                        <ul class="checklist" id="result-checklist">
-                            <!-- Injected via JS -->
-                        </ul>
+                        <ul class="checklist" id="result-checklist"></ul>
                     </div>
                     
                     <div class="card fun-fact-card">
@@ -130,9 +131,7 @@
                 <!-- Upcycling Ideas -->
                 <div class="card upcycling-card">
                     <h3><i class="fa-solid fa-recycle"></i> Creative Recycling Suggestions</h3>
-                    <div class="ideas-grid" id="result-ideas">
-                        <!-- Injected via JS -->
-                    </div>
+                    <div class="ideas-grid" id="result-ideas"></div>
                 </div>
             </section>
 
@@ -147,27 +146,21 @@
 
         </main>
 
-        <!-- Right Column: AI Settings Sidebar -->
+        <!-- Right Column: Local AI Status Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h3>AI Settings</h3>
-                <i class="fa-solid fa-gear"></i>
+                <h3>Local AI Status</h3>
+                <i class="fa-solid fa-microchip"></i>
             </div>
-            <p class="sidebar-desc">This demo uses the <strong>Google Gemini API</strong>. A key is hardcoded for this demo, but you can override it below.</p>
+            <p class="sidebar-desc">This app uses <strong>TensorFlow.js</strong> running directly in your browser. No API keys are required, and your images never leave your device.</p>
             
-            <div class="input-group">
-                <input type="password" id="api-key-input" placeholder="Paste Gemini API key">
+            <div id="api-status" class="status-message" style="font-weight: bold; margin-top: 20px;">
+                <i class="fa-solid fa-spinner fa-spin"></i> Downloading AI Model (16MB)...
             </div>
-            
-            <div class="sidebar-actions">
-                <button class="btn btn-primary" id="btn-save-key">Save</button>
-                <button class="btn btn-outline" id="btn-clear-key">Clear</button>
-            </div>
-            <div id="api-status" class="status-message"></div>
 
             <hr style="border-color: var(--border-color); margin: 20px 0;">
             
-            <h4 style="margin-bottom: 10px; font-size: 0.9rem;">Waste Categories Legend</h4>
+            <h4 style="margin-bottom: 10px; font-size: 0.9rem;">Waste Categories</h4>
             <ul class="legend-list">
                 <li><span class="legend-color" style="background: #10b981;"></span> Organic (Green)</li>
                 <li><span class="legend-color" style="background: #eab308;"></span> Inorganic (Yellow)</li>
