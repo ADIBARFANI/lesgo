@@ -1,9 +1,3 @@
-// ==========================================
-// ⚠️ HARDCODED API KEY (FOR DEMO ONLY)
-// Replace the text below with your actual API key
-// ==========================================
-const HARDCODED_API_KEY = "PASTE_YOUR_GEMINI_API_KEY_HERE"; 
-
 document.addEventListener('DOMContentLoaded', () => {
     
     // --- DOM Elements ---
@@ -15,24 +9,46 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCamera = document.getElementById('btn-camera');
     const btnUpload = document.getElementById('btn-upload');
     
-    // Camera Modal Elements
     const cameraModal = document.getElementById('camera-modal');
     const cameraVideo = document.getElementById('camera-video');
     const btnCapture = document.getElementById('btn-capture');
     const btnCloseCamera = document.getElementById('btn-close-camera');
 
-    // API Sidebar Elements
-    const apiKeyInput = document.getElementById('api-key-input');
-    const btnSaveKey = document.getElementById('btn-save-key');
-    const btnClearKey = document.getElementById('btn-clear-key');
     const apiStatus = document.getElementById('api-status');
-
-    // Map Elements
     const btnLocate = document.getElementById('btn-locate');
+    
     let map = null;
     let currentMediaStream = null;
+    let mobilenetModel = null;
 
-    // --- 1. IMAGE UPLOAD & DRAG/DROP ---
+    // --- 1. LOAD TENSORFLOW.JS MODEL ---
+    
+    async function loadModel() {
+        try {
+            apiStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Downloading AI Model (16MB)...`;
+            apiStatus.style.color = "var(--accent-cyan)";
+            
+            // Load the MobileNet model
+            mobilenetModel = await mobilenet.load();
+            
+            apiStatus.innerHTML = `<i class="fa-solid fa-check-circle"></i> AI Model Ready!`;
+            apiStatus.style.color = "var(--accent-emerald)";
+            
+            // Enable buttons now that the model is loaded
+            btnCamera.disabled = false;
+            btnUpload.disabled = false;
+            
+        } catch (error) {
+            console.error("Model loading failed:", error);
+            apiStatus.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Failed to load AI. Check connection.`;
+            apiStatus.style.color = "var(--accent-red)";
+        }
+    }
+    
+    // Start loading the model immediately
+    loadModel();
+
+    // --- 2. IMAGE UPLOAD & DRAG/DROP ---
     
     btnUpload.addEventListener('click', () => fileInput.click());
 
@@ -79,12 +95,12 @@ document.addEventListener('DOMContentLoaded', () => {
         return canvas.toDataURL('image/jpeg', 0.8);
     }
 
-    // --- 2. LIVE CAMERA LOGIC ---
+    // --- 3. LIVE CAMERA LOGIC ---
 
     btnCamera.addEventListener('click', async () => {
         try {
             currentMediaStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: 'environment' } // Prefer back camera
+                video: { facingMode: 'environment' }
             });
             cameraVideo.srcObject = currentMediaStream;
             cameraModal.classList.remove('hidden');
@@ -123,104 +139,128 @@ document.addEventListener('DOMContentLoaded', () => {
         loadImageAndAnalyze(dataUrl);
     });
 
-    function loadImageAndAnalyze(imageUrl) {
+    // --- 4. ANALYSIS & MAPPING LOGIC ---
+
+    async function loadImageAndAnalyze(imageUrl) {
         imagePreview.src = imageUrl;
         imagePreview.classList.remove('hidden');
         uploadPlaceholder.classList.add('hidden');
         
         resultsSection.classList.remove('hidden');
-        document.getElementById('result-object-name').textContent = "Analyzing...";
+        document.getElementById('result-object-name').textContent = "Analyzing image...";
         document.getElementById('result-category').textContent = "Please wait";
         
-        runAIAnalysis(imageUrl);
-    }
-
-    // --- 3. REAL AI INTEGRATION (GEMINI) ---
-
-    async function runAIAnalysis(imageUrl) {
-        let apiKey = HARDCODED_API_KEY;
-        if (apiKey === "PASTE_YOUR_GEMINI_API_KEY_HERE" || apiKey === "") {
-            apiKey = localStorage.getItem('geminiApiKey');
-        }
-
-        if (!apiKey) {
-            apiStatus.textContent = "No API key found. Using mock data...";
-            apiStatus.style.color = "var(--accent-orange)";
-            await simulateNetworkDelay();
-            renderResults(getRandomMockData());
+        if (!mobilenetModel) {
+            alert("AI model is still loading. Please wait a moment.");
             return;
         }
 
-        try {
-            apiStatus.textContent = "Contacting Gemini AI...";
-            apiStatus.style.color = "var(--accent-cyan)";
-
-            const base64Data = imageUrl.split(',')[1];
-
-            // UPDATED PROMPT: Restricting to 5 specific categories with definitions
-            const payload = {
-                contents: [{
-                    parts: [
-                        { text: `Analyze this image of waste. Categorize it strictly into ONE of these 5 categories based on Indonesian waste management standards:
-                        1. "Organic" (Food waste, leaves, biodegradable materials)
-                        2. "Inorganic" (Non-recyclable non-organic waste like ceramics, dirty wrappers, rubber)
-                        3. "Hazardous (B3)" (Batteries, electronics, chemicals, medical waste)
-                        4. "Recyclable" (Clean paper, plastic bottles, glass, metal cans)
-                        5. "Residual" (General trash, diapers, heavily soiled items, styrofoam)
-
-                        Return a strict JSON object with the following schema: 
-                        { 
-                          "object_name": "string (what is the specific item)", 
-                          "confidence": number (0-100), 
-                          "category": "string (Must be exactly one of: 'Organic', 'Inorganic', 'Hazardous (B3)', 'Recyclable', 'Residual')", 
-                          "bin_color": "string (Map directly: Green for Organic, Yellow for Inorganic, Red for Hazardous (B3), Blue for Recyclable, Grey for Residual)", 
-                          "preparation_tips": ["string", "string", "string"], 
-                          "fun_fact": "string", 
-                          "recycling_ideas": ["string", "string"] 
-                        }. Do not include markdown formatting or backticks. Return ONLY the raw JSON.` },
-                        { inline_data: { mime_type: "image/jpeg", data: base64Data } }
-                    ]
-                }],
-                generationConfig: {
-                    response_mime_type: "application/json"
+        const imgToAnalyze = new Image();
+        imgToAnalyze.src = imageUrl;
+        imgToAnalyze.onload = async () => {
+            try {
+                // Run the local AI classification
+                const predictions = await mobilenetModel.classify(imgToAnalyze);
+                
+                if (predictions && predictions.length > 0) {
+                    const topPrediction = predictions[0];
+                    // Clean up the name (e.g., "water bottle, bottle" -> "water bottle")
+                    const objectName = topPrediction.className.split(',')[0]; 
+                    const confidence = Math.round(topPrediction.probability * 100);
+                    
+                    // Map the object to our 5 specific categories
+                    const mappedData = mapToCategories(objectName, confidence);
+                    renderResults(mappedData);
+                } else {
+                    // Fallback if AI can't figure it out
+                    const fallbackData = generateData("Unknown Item", 50, "Residual", "Grey");
+                    renderResults(fallbackData);
                 }
-            };
-
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error.message || "API Error");
+            } catch (error) {
+                console.error("Classification error:", error);
+                alert("Failed to analyze the image.");
             }
+        };
+    }
 
-            const data = await response.json();
-            let jsonText = data.candidates[0].content.parts[0].text;
-            jsonText = jsonText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const resultData = JSON.parse(jsonText);
-            
-            apiStatus.textContent = "Analysis complete!";
-            apiStatus.style.color = "var(--accent-emerald)";
-            renderResults(resultData);
+    // --- 5. THE SMARTER MAPPING DICTIONARY ---
+    // Maps MobileNet's 1000 generic classes to the 5 specific waste categories
 
-        } catch (error) {
-            console.error("AI Error:", error);
-            apiStatus.textContent = `Error: ${error.message}. Falling back to mock.`;
-            apiStatus.style.color = "var(--accent-red)";
-            
-            await simulateNetworkDelay();
-            renderResults(getRandomMockData());
+    function mapToCategories(className, confidence) {
+        const name = className.toLowerCase();
+        
+        let category = "Residual";
+        let binColor = "Grey";
+
+        // Organic (Green)
+        if (name.match(/banana|apple|orange|lemon|strawberry|broccoli|cabbage|cauliflower|mushroom|cucumber|pepper|squash|artichoke|fig|pineapple|pomegranate|corn|flower|leaf|plant|tree|food|vegetable|fruit/)) {
+            category = "Organic";
+            binColor = "Green";
         }
+        // Hazardous B3 (Red)
+        else if (name.match(/cellular|phone|laptop|computer|battery|remote|mouse|keyboard|monitor|tv|screen|drill|calculator|radio|camera|ipod|hard disc|modem|router|printer|scanner|switch|transmitter|electronic/)) {
+            category = "Hazardous (B3)";
+            binColor = "Red";
+        }
+        // Recyclable (Blue)
+        else if (name.match(/bottle|can|jar|carton|newspaper|envelope|notebook|paper|book|magazine|packet|box|tin|glass|plastic|bag/)) {
+            category = "Recyclable";
+            binColor = "Blue";
+        }
+        // Inorganic (Yellow)
+        else if (name.match(/mug|cup|pot|vase|ceramic|plate|bowl|teapot|clock|toy|rubber|leather|shoe|clothing|fabric|wood|metal/)) {
+            category = "Inorganic";
+            binColor = "Yellow";
+        }
+
+        return generateData(className, confidence, category, binColor);
     }
 
-    function simulateNetworkDelay() {
-        return new Promise(resolve => setTimeout(resolve, 1500));
+    // --- 6. DYNAMIC DATA GENERATION (Replaces API) ---
+
+    function generateData(objectName, confidence, category, binColor) {
+        const data = {
+            object_name: objectName,
+            confidence: confidence,
+            category: category,
+            bin_color: binColor,
+            preparation_tips: [],
+            fun_fact: "",
+            recycling_ideas: []
+        };
+
+        switch(category) {
+            case "Organic":
+                data.preparation_tips = ["Remove any plastic stickers or packaging", "Chop into smaller pieces to speed up composting", "Keep separate from dry recyclables"];
+                data.fun_fact = "Organic waste decomposes naturally in weeks, returning valuable nutrients to the soil.";
+                data.recycling_ideas = ["Use for home composting.", "Create natural plant fertilizer.", "Use as feed for backyard animals."];
+                break;
+            case "Hazardous (B3)":
+                data.preparation_tips = ["Do not puncture, crush, or dismantle", "Tape battery ends if applicable", "Store in a cool, dry place until drop-off"];
+                data.fun_fact = "Hazardous waste contains heavy metals that can contaminate groundwater if thrown in regular trash.";
+                data.recycling_ideas = ["Look for specialized e-waste drop-off bins.", "Check for local hazardous waste collection days.", "Donate working electronics."];
+                break;
+            case "Recyclable":
+                data.preparation_tips = ["Empty and rinse out any food or liquid residue", "Compress or flatten to save space", "Remove and separate caps if applicable"];
+                data.fun_fact = "Recycling materials saves massive amounts of energy compared to manufacturing from raw resources.";
+                data.recycling_ideas = ["Transform into a self-watering plant pot.", "Create desk organizers or pen holders.", "Use for DIY arts and crafts."];
+                break;
+            case "Inorganic":
+                data.preparation_tips = ["Wrap sharp or broken pieces safely", "Do not mix with glass recycling", "Place in inorganic waste bin"];
+                data.fun_fact = "Inorganic waste like ceramics and rubber does not decompose naturally and takes centuries to break down.";
+                data.recycling_ideas = ["Use broken pieces for mosaic art.", "Reuse as drainage in plant pots.", "Upcycle into unique home decor."];
+                break;
+            case "Residual":
+            default:
+                data.preparation_tips = ["Wrap tightly to contain odors", "Ensure it is separated from recyclables", "Place in general residual waste bin"];
+                data.fun_fact = "Residual waste is the final waste that cannot be recycled or composted, ending up in landfills.";
+                data.recycling_ideas = ["Try to reduce single-use items in the future.", "Look for creative ways to reuse the item.", "Support businesses that use sustainable packaging."];
+                break;
+        }
+        return data;
     }
 
-    // --- 4. DYNAMIC RENDERING ---
+    // --- 7. DYNAMIC RENDERING ---
 
     function renderResults(data) {
         document.getElementById('result-image').src = imagePreview.src;
@@ -236,14 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const binText = document.getElementById('result-bin-text');
         binText.textContent = `${data.bin_color} Bin`;
         
-        // UPDATED COLOR MAP: Strictly matching the 5 categories
         const colorMap = {
-            'Green': '#10b981',   // Organic
-            'Yellow': '#eab308',  // Inorganic
-            'Red': '#ef4444',     // Hazardous (B3)
-            'Blue': '#3b82f6',    // Recyclable
-            'Grey': '#94a3b8',    // Residual
-            'Gray': '#94a3b8'     // Fallback US spelling
+            'Green': '#10b981', 'Yellow': '#eab308', 'Red': '#ef4444', 
+            'Blue': '#3b82f6', 'Grey': '#94a3b8', 'Gray': '#94a3b8'
         };
         const binColor = colorMap[data.bin_color] || '#94a3b8';
         
@@ -273,164 +308,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // --- 5. EXPANDED MOCK DATA ENGINE (Aligned to 5 Categories) ---
-
-    function getRandomMockData() {
-        const mocks = [
-            // 1. Recyclable (Blue)
-            {
-                "object_name": "Crushed Plastic Water Bottle",
-                "confidence": 92,
-                "category": "Recyclable",
-                "bin_color": "Blue",
-                "preparation_tips": ["Rinse out liquid residue", "Compress the bottle tightly", "Remove and separate the plastic cap"],
-                "fun_fact": "Recycling a single plastic bottle saves enough energy to power a lightbulb for up to 3 hours.",
-                "recycling_ideas": ["Transform into a self-watering plant pot.", "Cut and smooth edges to create a desk pen holder.", "Collect caps for community art installations."]
-            },
-            // 2. Organic (Green)
-            {
-                "object_name": "Banana Peel",
-                "confidence": 98,
-                "category": "Organic",
-                "bin_color": "Green",
-                "preparation_tips": ["Remove any plastic stickers", "Chop into smaller pieces to speed up composting", "Keep separate from dry recyclables"],
-                "fun_fact": "Banana peels decompose in just 3-4 weeks, returning valuable nutrients to the soil.",
-                "recycling_ideas": ["Use as a natural fertilizer for tomato plants.", "Blend with water for a DIY plant spray.", "Use the inside to polish leather shoes."]
-            },
-            // 3. Hazardous (B3) (Red)
-            {
-                "object_name": "Used AA Battery",
-                "confidence": 91,
-                "category": "Hazardous (B3)",
-                "bin_color": "Red",
-                "preparation_tips": ["Tape the ends with clear tape to prevent sparks", "Do not puncture or crush", "Store in a cool, dry place until drop-off"],
-                "fun_fact": "Batteries contain heavy metals that can leach into the soil and contaminate groundwater if thrown in regular trash.",
-                "recycling_ideas": ["Look for specialized battery drop-off bins at electronics stores.", "Check if your local municipality has a hazardous waste day."]
-            },
-            // 4. Residual (Grey)
-            {
-                "object_name": "Used Baby Diaper",
-                "confidence": 85,
-                "category": "Residual",
-                "bin_color": "Grey",
-                "preparation_tips": ["Roll up tightly and secure with the adhesive tabs", "Wrap in a plastic bag to contain odors", "Place in general residual waste bin"],
-                "fun_fact": "Disposable diapers take up to 500 years to decompose in a landfill and cannot be recycled.",
-                "recycling_ideas": ["Consider switching to cloth diapers to reduce waste.", "Look for local programs that compost diapers (very rare)."]
-            },
-            // 5. Inorganic (Yellow)
-            {
-                "object_name": "Broken Ceramic Mug",
-                "confidence": 87,
-                "category": "Inorganic",
-                "bin_color": "Yellow",
-                "preparation_tips": ["Wrap sharp pieces in newspaper for safety", "Do NOT put in glass recycling (different melting point)", "Place in inorganic waste bin"],
-                "fun_fact": "Ceramics melt at a much higher temperature than glass, meaning they can ruin an entire batch of recycled glass.",
-                "recycling_ideas": ["Use broken pieces for mosaic art.", "Crush into small pieces for drainage in plant pots.", "Use the handle as a small tool."]
-            },
-            // 6. Recyclable (Blue)
-            {
-                "object_name": "Stack of Newspapers",
-                "confidence": 94,
-                "category": "Recyclable",
-                "bin_color": "Blue",
-                "preparation_tips": ["Keep dry and clean", "Remove any plastic delivery bags", "Do not tie with string or wire"],
-                "fun_fact": "A single sheet of newspaper can be recycled up to 7 times before the fibers become too short.",
-                "recycling_ideas": ["Use for cleaning windows (no streaks!).", "Create DIY paper mache crafts.", "Use as biodegradable wrapping paper."]
-            },
-            // 7. Hazardous (B3) (Red)
-            {
-                "object_name": "Old Smartphone",
-                "confidence": 89,
-                "category": "Hazardous (B3)",
-                "bin_color": "Red",
-                "preparation_tips": ["Factory reset the device to erase data", "Remove the SIM and SD cards", "Do not throw in regular trash"],
-                "fun_fact": "E-waste contains precious metals like gold and silver that can be recovered and reused.",
-                "recycling_ideas": ["Use as a dedicated dashcam or security camera.", "Turn it into a digital photo frame.", "Donate it to local electronics recycling programs."]
-            },
-            // 8. Residual (Grey)
-            {
-                "object_name": "Styrofoam Food Container",
-                "confidence": 88,
-                "category": "Residual",
-                "bin_color": "Grey",
-                "preparation_tips": ["Scrape out food residue", "Rinse if possible", "Place in general residual bin (not recyclable)"],
-                "fun_fact": "Styrofoam is notoriously difficult to recycle and can take over 500 years to break down.",
-                "recycling_ideas": ["Reuse as a paint palette for DIY projects.", "Use as packing material for shipping.", "Avoid buying styrofoam in the future."]
-            },
-            // 9. Organic (Green)
-            {
-                "object_name": "Vegetable Scraps",
-                "confidence": 96,
-                "category": "Organic",
-                "bin_color": "Green",
-                "preparation_tips": ["Remove any plastic packaging or rubber bands", "Chop into smaller pieces", "Add to compost bin"],
-                "fun_fact": "Composting vegetable scraps creates nutrient-rich soil that reduces the need for chemical fertilizers.",
-                "recycling_ideas": ["Make homemade vegetable broth.", "Use as feed for backyard chickens or worms.", "Blend into a liquid fertilizer."]
-            },
-            // 10. Recyclable (Blue)
-            {
-                "object_name": "Aluminum Soda Can",
-                "confidence": 96,
-                "category": "Recyclable",
-                "bin_color": "Blue",
-                "preparation_tips": ["Empty any remaining liquid", "Rinse quickly to prevent pests", "Crush to save space in the bin"],
-                "fun_fact": "Recycling aluminum saves 95% of the energy needed to make new aluminum from raw ore.",
-                "recycling_ideas": ["Cut into strips to make a decorative lantern.", "Use as miniature plant pots.", "Create a DIY bird feeder."]
-            },
-            // 11. Hazardous (B3) (Red)
-            {
-                "object_name": "Empty Aerosol Spray Can",
-                "confidence": 90,
-                "category": "Hazardous (B3)",
-                "bin_color": "Red",
-                "preparation_tips": ["Ensure the can is completely empty", "Do not puncture or crush the can", "Check if your local hazardous waste facility accepts them"],
-                "fun_fact": "Aerosol cans are pressurized and can explode if punctured or incinerated.",
-                "recycling_ideas": ["Check if your local scrap yard accepts them.", "Use the empty can for a DIY spray paint project."]
-            },
-            // 12. Inorganic (Yellow)
-            {
-                "object_name": "Dirty Plastic Wrapper",
-                "confidence": 83,
-                "category": "Inorganic",
-                "bin_color": "Yellow",
-                "preparation_tips": ["Wipe off excess food or grease", "Do not put in recyclable bin (too dirty)", "Place in inorganic waste bin"],
-                "fun_fact": "Dirty plastic wrappers are often too contaminated to be recycled and end up in landfills.",
-                "recycling_ideas": ["Use as a makeshift waterproof layer for outdoor projects.", "Stuff into a pillowcase to make a DIY pet bed."]
-            }
-        ];
-        
-        return mocks[Math.floor(Math.random() * mocks.length)];
-    }
-
-    // --- 6. API KEY MANAGEMENT (Sidebar fallback) ---
-
-    if (localStorage.getItem('geminiApiKey')) {
-        apiKeyInput.value = localStorage.getItem('geminiApiKey');
-        apiStatus.textContent = "API Key loaded from storage.";
-    }
-
-    btnSaveKey.addEventListener('click', () => {
-        const key = apiKeyInput.value.trim();
-        if (key) {
-            localStorage.setItem('geminiApiKey', key);
-            apiStatus.style.color = 'var(--accent-emerald)';
-            apiStatus.textContent = "API Key saved successfully!";
-            setTimeout(() => apiStatus.textContent = "", 3000);
-        } else {
-            apiStatus.style.color = 'var(--accent-red)';
-            apiStatus.textContent = "Please enter a valid key.";
-        }
-    });
-
-    btnClearKey.addEventListener('click', () => {
-        localStorage.removeItem('geminiApiKey');
-        apiKeyInput.value = '';
-        apiStatus.style.color = 'var(--text-secondary)';
-        apiStatus.textContent = "API Key cleared.";
-        setTimeout(() => apiStatus.textContent = "", 3000);
-    });
-
-    // --- 7. MAP INTEGRATION ---
+    // --- 8. MAP INTEGRATION ---
     
     const recyclingIcon = L.divIcon({
         className: 'custom-div-icon',
@@ -489,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Error getting location:", error);
                 alert("Could not get your location. Please check browser permissions.");
                 btnLocate.innerHTML = `<i class="fa-solid fa-location-crosshairs"></i> Find Near Me`;
-                initMap(-6.2088, 106.8456); // Fallback
+                initMap(-6.2088, 106.8456);
             }
         );
     });
